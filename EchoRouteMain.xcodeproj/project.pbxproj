@@ -399,6 +399,9 @@
 				DEVELOPMENT_TEAM = SAPPKJ98U9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs the camera.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs the microphone to record speech.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app needs to use speech recognisiton";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -428,6 +431,9 @@
 				DEVELOPMENT_TEAM = SAPPKJ98U9;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "This app needs the camera.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "This app needs the microphone to record speech.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "This app needs to use speech recognisiton";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

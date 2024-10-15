@@ -11,7 +11,16 @@ import SwiftUI
 struct EchoRouteMainApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            TabView {
+                ContentView()
+                    .tabItem {
+                        Label("EchoRoute", systemImage: "book")
+                    }
+                DeveloperView()
+                    .tabItem {
+                        Label("Developer", systemImage: "gear")
+                    }
+            }
         }
     }
 }
