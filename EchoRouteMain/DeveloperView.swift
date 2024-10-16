@@ -33,18 +33,17 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: CameraPreviewView, context: Context) {}
 }
 
-
 struct DeveloperView: View {
     @StateObject private var cameraController = CameraController()  // Use new CameraController instance
     @StateObject private var speechRecognizer = SpeechRecognizer()  // Speech recognizer instance
     @State private var isRecording = false  // Track recording state
     @State private var parsedText: String = ""  // Store parsed text
     @State private var isDepthEnabled = false  // Track LiDAR depth toggle
-
     private let modelHandler = ModelHandler()  // Instance of ModelHandler
-
+    private let speechSynthesizer = AVSpeechSynthesizer()  // AVSpeechSynthesizer for TTS
+    
     var body: some View {
-        VStack (spacing: 10){
+        VStack (spacing: 10) {
             ZStack {
                 // Display camera preview or a placeholder if session is not running
                 if cameraController.isSessionRunning, let capturedImage = cameraController.capturedImage {
@@ -91,7 +90,6 @@ struct DeveloperView: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle)
                 .controlSize(.large)
-//                .frame(width: 120, height: 100) // Static width and height
                 .background(cameraController.isSessionRunning ? Color.blue : Color.clear)
                 .foregroundColor(cameraController.isSessionRunning ? Color.white : Color.blue)
                 .cornerRadius(12)
@@ -102,15 +100,12 @@ struct DeveloperView: View {
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle)
                 .controlSize(.large)
-//                .frame(width: 120, height: 100) // Static width and height
                 .background(isDepthEnabled ? Color.blue : Color.clear)
                 .foregroundColor(isDepthEnabled ? Color.white : Color.blue)
                 .cornerRadius(12)
             }
             .frame(maxWidth: .infinity)
             .padding()
-
-
 
             // Display transcribed and parsed text
             ScrollView {
@@ -149,7 +144,6 @@ struct DeveloperView: View {
                 .buttonBorderShape(.roundedRectangle)
             }
             .padding()
-
         }
         .padding()
         .onAppear {
@@ -182,26 +176,37 @@ struct DeveloperView: View {
             .lowercased()
     }
 
-    // Parse recorded text using ModelHandler
+    // Parse recorded text using ModelHandler and trigger TTS
     private func parseText() {
-        let recordedText = "/Find me somewhere to sit/"  // Example input for testing
+//        let recordedText = speechRecognizer.transcript
+        let recordedText = "Find me somewhere to sit"
         let cleanedText = cleanText(recordedText)
 
         modelHandler.predictCompletion(for: cleanedText) { prediction, error in
             if let prediction = prediction {
                 DispatchQueue.main.async {
                     self.parsedText = prediction
+                    self.speakText(prediction)  // Call TTS function
                 }
             } else if let error = error {
                 print("Error parsing text: \(error.localizedDescription)")
             }
         }
     }
+
+    // Text-to-Speech function
+    private func speakText(_ text: String) {
+        let utterance = AVSpeechUtterance(string: "Let's find you a \(text).")
+        utterance.voice = AVSpeechSynthesisVoice(language: "en-US")  // Set the language
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate  // Set the speed of speech
+        speechSynthesizer.speak(utterance)
+    }
 }
 
 #Preview {
     DeveloperView()
 }
+
 
 
 
