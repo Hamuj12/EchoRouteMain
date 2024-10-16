@@ -33,97 +33,137 @@ struct CameraPreview: UIViewRepresentable {
     func updateUIView(_ uiView: CameraPreviewView, context: Context) {}
 }
 
+
 struct DeveloperView: View {
-    @StateObject private var camera = Camera()  // Camera instance
+    @StateObject private var cameraController = CameraController()  // Use new CameraController instance
     @StateObject private var speechRecognizer = SpeechRecognizer()  // Speech recognizer instance
     @State private var isRecording = false  // Track recording state
-    @State private var isCameraRunning = false  // Track if the camera is running
-    @State private var parsedText: String = ""  // Store the predicted text
+    @State private var parsedText: String = ""  // Store parsed text
+    @State private var isDepthEnabled = false  // Track LiDAR depth toggle
 
     private let modelHandler = ModelHandler()  // Instance of ModelHandler
 
     var body: some View {
-        VStack {
+        VStack (spacing: 10){
             ZStack {
-                if isCameraRunning {
-                    CameraPreview(camera: camera)
-                        .frame(height: 500)
+                // Display camera preview or a placeholder if session is not running
+                if cameraController.isSessionRunning, let capturedImage = cameraController.capturedImage {
+                    Image(uiImage: capturedImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(height: 475)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
                 } else {
                     Text("Camera is off")
-                        .frame(height: 500)
+                        .frame(height: 475)
                         .frame(maxWidth: .infinity)
                         .background(Color.gray.opacity(0.2))
                         .cornerRadius(12)
                         .shadow(radius: 5)
                 }
+
+                // Display a reticle if LiDAR is enabled
+                if isDepthEnabled {
+                    VStack {
+                        Spacer()
+                        Text("Depth: \(cameraController.closestDepth, specifier: "%.2f") meters")
+                            .font(.headline)
+                            .foregroundColor(.white)
+                            .padding(8)
+                            .background(Color.black.opacity(0.7))
+                            .cornerRadius(8)
+                        Spacer()
+                    }
+                    .transition(.opacity)
+                    .animation(.easeInOut, value: isDepthEnabled)
+                }
             }
-            
-            HStack(spacing: 20) {
-                Button("Start Capture") {
-                    Task {
-                        await camera.start()
-                        isCameraRunning = true
+
+            HStack(spacing: 16) {
+                Button(cameraController.isSessionRunning ? "Stop Camera Capture" : "Start Camera Capture") {
+                    if cameraController.isSessionRunning {
+                        cameraController.stopSession()
+                    } else {
+                        cameraController.startSession()
                     }
                 }
                 .buttonStyle(.bordered)
                 .buttonBorderShape(.roundedRectangle)
                 .controlSize(.large)
-
-                Button("Stop Capture") {
-                    camera.stop()
-                    isCameraRunning = false
-                }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle)
-                .controlSize(.large)
-            }
-
-            VStack {
-                // Display transcribed and parsed text
-                ScrollView {
-                    VStack(alignment: .leading) {
-                        Text(speechRecognizer.transcript)  // Original transcript
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        if !parsedText.isEmpty {
-                            Text(parsedText)  // Parsed text in bold and blue
-                                .bold()
-                                .foregroundColor(.blue)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                    }
-                }
-                .frame(minHeight: 20)
-                .padding()
-                .background(Color.gray.opacity(0.2))
+//                .frame(width: 120, height: 100) // Static width and height
+                .background(cameraController.isSessionRunning ? Color.blue : Color.clear)
+                .foregroundColor(cameraController.isSessionRunning ? Color.white : Color.blue)
                 .cornerRadius(12)
-                .padding(.horizontal)
 
-                // Record and Parse Buttons
-                HStack {
-                    Button(isRecording ? "Stop Recording" : "Record Audio") {
-                        toggleRecording()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                Button(isDepthEnabled ? "Disable LiDAR Depth" : "Enable LiDAR Depth") {
+                    isDepthEnabled.toggle()
+                }
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.roundedRectangle)
+                .controlSize(.large)
+//                .frame(width: 120, height: 100) // Static width and height
+                .background(isDepthEnabled ? Color.blue : Color.clear)
+                .foregroundColor(isDepthEnabled ? Color.white : Color.blue)
+                .cornerRadius(12)
+            }
+            .frame(maxWidth: .infinity)
+            .padding()
 
-                    Button("Parse") {
-                        parseText()
+
+
+            // Display transcribed and parsed text
+            ScrollView {
+                VStack(alignment: .leading) {
+                    Text(speechRecognizer.transcript)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    if !parsedText.isEmpty {
+                        Text(parsedText)
+                            .bold()
+                            .foregroundColor(.blue)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    .buttonStyle(.bordered)
-                    .controlSize(.large)
                 }
             }
+            .frame(minHeight: 20, maxHeight: 20)
+            .padding()
+            .background(Color.gray.opacity(0.2))
+            .cornerRadius(12)
+
+            HStack {
+                Button(isRecording ? "Stop Recording" : "Record Audio") {
+                    toggleRecording()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle)
+                .background(isRecording ? Color.red : Color.clear)
+                .foregroundColor(isRecording ? Color.white : Color.blue)
+                .cornerRadius(12)
+
+                Button("Parse") {
+                    parseText()
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle)
+            }
+            .padding()
+
         }
         .padding()
+        .onAppear {
+            // Ensure session is properly stopped when first loading the view
+            if !cameraController.isSessionRunning {
+                cameraController.stopSession()
+            }
+        }
         .onDisappear {
-            camera.stop()
-            isCameraRunning = false
+            cameraController.stopSession()  // Stop session when leaving the view
         }
     }
 
-    // Toggle the recording state
+    // Toggle recording state
     private func toggleRecording() {
         if isRecording {
             speechRecognizer.stopTranscribing()
@@ -133,34 +173,30 @@ struct DeveloperView: View {
         isRecording.toggle()
     }
 
-    // Helper function to clean and format text
+    // Clean and format recorded text
     private func cleanText(_ text: String) -> String {
         let allowedCharacters = CharacterSet.letters.union(.whitespaces)
-        let cleanedText = text
-            .components(separatedBy: allowedCharacters.inverted)  // Remove non-letter characters
-            .joined()  // Join the parts without separators
-            .lowercased()  // Convert to lowercase
-
-        return cleanedText
+        return text
+            .components(separatedBy: allowedCharacters.inverted)
+            .joined()
+            .lowercased()
     }
 
-    // Parse the recorded text using ModelHandler
+    // Parse recorded text using ModelHandler
     private func parseText() {
-//        let recordedText = speechRecognizer.transcript
-        let recordedText = "/Find me somewhere to sit/" // test input without recording
-        let cleanedText = cleanText(recordedText)  // Clean the recorded text
+        let recordedText = "/Find me somewhere to sit/"  // Example input for testing
+        let cleanedText = cleanText(recordedText)
 
         modelHandler.predictCompletion(for: cleanedText) { prediction, error in
             if let prediction = prediction {
                 DispatchQueue.main.async {
-                    self.parsedText = prediction  // Update the parsed text
+                    self.parsedText = prediction
                 }
             } else if let error = error {
                 print("Error parsing text: \(error.localizedDescription)")
             }
         }
     }
-
 }
 
 #Preview {
