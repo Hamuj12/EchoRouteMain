@@ -106,13 +106,12 @@ struct DeveloperView: View {
                 if cameraController.isSessionRunning, let capturedImage = cameraController.capturedImage {
                     Image(uiImage: capturedImage)
                         .resizable()
-                        .scaledToFit()
-                        .frame(height: 475)
+                        .frame(height: 450)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
                 } else {
                     Text("Camera is off")
-                        .frame(height: 475)
+                        .frame(height: 450)
                         .frame(maxWidth: .infinity)
                         .background(Color.gray.opacity(0.2))
                         .cornerRadius(12)
@@ -122,7 +121,7 @@ struct DeveloperView: View {
                 // Display bounding boxes for detected objects
                 if cameraController.detectionEnabled {
                     BoundingBoxOverlay(objects: detectedObjects)
-                        .frame(height: 475)
+                        .frame(height: 450)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
                 }
@@ -188,7 +187,6 @@ struct DeveloperView: View {
                 .toggleStyle(SwitchToggleStyle())
             }
             .frame(maxWidth: .infinity)
-            .padding()
             
             // Display transcribed and parsed text
             ScrollView {
