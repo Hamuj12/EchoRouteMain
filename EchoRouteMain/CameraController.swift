@@ -11,6 +11,8 @@ class CameraController: NSObject, ObservableObject {
     private let captureSession = AVCaptureSession()
     private var videoDataOutput: AVCaptureVideoDataOutput?
     private var depthDataOutput: AVCaptureDepthDataOutput?
+    var detectionHandler = DetectionHandler()
+    private var isDetectionEnabled = false
     
     private enum SetupError: Error {
         case cameraUnavailable
@@ -23,8 +25,18 @@ class CameraController: NSObject, ObservableObject {
         super.init()
         do {
             try setupCaptureSession()
+            setupDetectionHandler()
         } catch {
             handleSetupError(error)
+        }
+    }
+    
+    private func setupDetectionHandler() {
+        detectionHandler.onDetectionsUpdate = { [weak self] detections in
+            // Handle detection updates
+            // Assuming there's a way to connect this to UI or further process
+            print("Detections updated: \(detections)")
+            // Add logic to update UI (like a bounding box view) here
         }
     }
     
@@ -132,6 +144,15 @@ class CameraController: NSObject, ObservableObject {
             }
         }
     }
+    
+    // Computed property to expose isDetectionEnabled status
+    public var detectionEnabled: Bool {
+        return isDetectionEnabled
+    }
+    
+    func enableDetections(_ enable: Bool) {
+        isDetectionEnabled = enable
+    }
 }
 
 extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCaptureDepthDataOutputDelegate {
@@ -147,6 +168,11 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapt
 
         DispatchQueue.main.async { [weak self] in
             self?.capturedImage = image
+        }
+        
+        // Handle detection if enabled
+        if isDetectionEnabled {
+            detectionHandler.detectObjects(in: pixelBuffer)
         }
     }
     
