@@ -97,6 +97,8 @@ struct DeveloperView: View {
     @State private var isDepthEnabled = false  // Track LiDAR depth toggle
     @State private var detectedObjects: [VNRecognizedObjectObservation] = []
     @State private var filterKeyword: String? = nil
+    @State private var isParsing = false  // Track if parsing is in progress
+    @State private var isFiltering = false  // Track if filtering is in progress
     
     private let modelHandler = ModelHandler()  // Instance of ModelHandler
     private let speechSynthesizer = AVSpeechSynthesizer()  // AVSpeechSynthesizer for TTS
@@ -219,22 +221,46 @@ struct DeveloperView: View {
                 .foregroundColor(isRecording ? Color.white : Color.blue)
                 .cornerRadius(12)
 
-                Button("Parse") {
-                    parseText()
+                Button(action: {
+                    isParsing = true
+                    Task {
+                        do {
+                            let prediction = try await modelHandler.predictCompletion(for: cleanText(speechRecognizer.transcript))
+                            self.parsedText = prediction
+                            speakText(prediction)
+                        } catch {
+                            print("Error parsing text: \(error.localizedDescription)")
+                        }
+                        isParsing = false
+                    }
+                }) {
+                    if isParsing {
+                        ProgressView()
+                    } else {
+                        Text("Parse")
+                    }
                 }
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .buttonBorderShape(.roundedRectangle)
-                
-                Button("Filter") {
+
+                Button(action: {
+                    isFiltering = true
                     Task {
                         do {
                             let prediction = try await modelHandler.predictCompletion(for: cleanText(speechRecognizer.transcript))
-                            filterKeyword = prediction  // Store the prediction for filtering
-                            applyFilter()  // Apply the filter after updating the keyword
+                            filterKeyword = prediction
+                            applyFilter()
                         } catch {
                             print("Error parsing text: \(error.localizedDescription)")
                         }
+                        isFiltering = false
+                    }
+                }) {
+                    if isFiltering {
+                        ProgressView()
+                    } else {
+                        Text("Filter")
                     }
                 }
                 .buttonStyle(.bordered)
@@ -242,6 +268,7 @@ struct DeveloperView: View {
                 .buttonBorderShape(.roundedRectangle)
             }
             .padding()
+
         }
         .padding()
         .onAppear {
