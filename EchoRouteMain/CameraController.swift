@@ -2,6 +2,13 @@ import AVFoundation
 import UIKit
 import Vision
 
+struct GuidanceModelInput {
+    let objectId: UUID
+    let centerX: CGFloat
+    let centerY: CGFloat
+    let depth: Float
+}
+
 class CameraController: NSObject, ObservableObject {
     @Published var capturedImage: UIImage?
     @Published var isSessionRunning = false
@@ -9,6 +16,8 @@ class CameraController: NSObject, ObservableObject {
     @Published var errorMessage: String?
     @Published var objectsWithDepth: [ObjectWithDepth] = []
 
+    private let guidanceInputQueue = DispatchQueue(label: "guidanceInputQueue")
+    private var guidanceInputs: [GuidanceModelInput] = []
     private let captureSession = AVCaptureSession()
     private var videoDataOutput: AVCaptureVideoDataOutput?
     private var depthDataOutput: AVCaptureDepthDataOutput?
@@ -198,6 +207,14 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapt
             let offset = centerY * bytesPerRow + centerX * MemoryLayout<Float>.size
             let depth = baseAddress.load(fromByteOffset: offset, as: Float.self)
             
+            if depth > 0 {
+                let input = GuidanceModelInput(objectId: objectWithDepth.observation.uuid,
+                                               centerX: CGFloat(centerX),
+                                               centerY: CGFloat(centerY),
+                                               depth: depth)
+                self.enqueueGuidanceInput(input)
+            }
+            
             return ObjectWithDepth(observation: objectWithDepth.observation, depth: depth > 0 ? depth : nil)
         }
         
@@ -205,6 +222,27 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapt
             self?.objectsWithDepth = updatedObjects
             self?.closestDepth = updatedObjects.compactMap { $0.depth }.min() ?? Float.infinity
             self?.detectionHandler.onDetectionsUpdate?(updatedObjects)
+            self?.printGuidanceInputs() // Print inputs after updating
+        }
+    }
+    
+    private func enqueueGuidanceInput(_ input: GuidanceModelInput) {
+        guidanceInputQueue.async {
+            self.guidanceInputs.append(input)
+            // Keep only the last 100 inputs (adjust as needed)
+            if self.guidanceInputs.count > 100 {
+                self.guidanceInputs.removeFirst()
+            }
+        }
+    }
+    
+    private func printGuidanceInputs() {
+        guidanceInputQueue.async {
+            print("Current Guidance Model Inputs:")
+            for input in self.guidanceInputs {
+                print("Object ID: \(input.objectId), X: \(input.centerX), Y: \(input.centerY), Depth: \(input.depth)")
+            }
+            print("------------------------")
         }
     }
 }

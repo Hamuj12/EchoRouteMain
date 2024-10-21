@@ -137,22 +137,6 @@ struct DeveloperView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
                 }
-
-                // Display a reticle if LiDAR is enabled
-//                if isDepthEnabled {
-//                    VStack {
-//                        Spacer()
-//                        Text("Depth: \(cameraController.closestDepth, specifier: "%.2f") meters")
-//                            .font(.headline)
-//                            .foregroundColor(.white)
-//                            .padding(8)
-//                            .background(Color.black.opacity(0.7))
-//                            .cornerRadius(8)
-//                        Spacer()
-//                    }
-//                    .transition(.opacity)
-//                    .animation(.easeInOut, value: isDepthEnabled)
-//                }
             }
 
             VStack(spacing: 16) {
