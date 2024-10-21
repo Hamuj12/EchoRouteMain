@@ -7,6 +7,7 @@ class CameraController: NSObject, ObservableObject {
     @Published var isSessionRunning = false
     @Published var closestDepth: Float = Float.infinity
     @Published var errorMessage: String?
+    @Published var objectsWithDepth: [ObjectWithDepth] = []
 
     private let captureSession = AVCaptureSession()
     private var videoDataOutput: AVCaptureVideoDataOutput?
@@ -189,24 +190,22 @@ extension CameraController: AVCaptureVideoDataOutputSampleBufferDelegate, AVCapt
         let height = CVPixelBufferGetHeight(pixelBuffer)
         let bytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
         
-        var minDepth = Float.infinity
-        
-        let sampleStep = 5 // Sample every 5th pixel for performance
-        for y in stride(from: 0, to: height, by: sampleStep) {
-            for x in stride(from: 0, to: width, by: sampleStep) {
-                let offset = y * bytesPerRow + x * MemoryLayout<Float>.size
-                let depth = baseAddress.load(fromByteOffset: offset, as: Float.self)
-                
-                if depth > 0 && depth < minDepth {
-                    minDepth = depth
-                }
-            }
+        // Update depths for detected objects
+        let updatedObjects = objectsWithDepth.map { objectWithDepth -> ObjectWithDepth in
+            let centerX = Int(objectWithDepth.observation.boundingBox.midX * CGFloat(width))
+            let centerY = Int(objectWithDepth.observation.boundingBox.midY * CGFloat(height))
+            
+            let offset = centerY * bytesPerRow + centerX * MemoryLayout<Float>.size
+            let depth = baseAddress.load(fromByteOffset: offset, as: Float.self)
+            
+            return ObjectWithDepth(observation: objectWithDepth.observation, depth: depth > 0 ? depth : nil)
         }
         
         DispatchQueue.main.async { [weak self] in
-            if minDepth < Float.infinity {
-                self?.closestDepth = minDepth
-            }
+            self?.objectsWithDepth = updatedObjects
+            self?.closestDepth = updatedObjects.compactMap { $0.depth }.min() ?? Float.infinity
+            self?.detectionHandler.onDetectionsUpdate?(updatedObjects)
         }
     }
 }
+

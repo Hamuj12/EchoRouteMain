@@ -52,17 +52,16 @@ class ColorManager {
 }
 
 struct BoundingBoxOverlay: View {
-    let objects: [VNRecognizedObjectObservation]
+    let objects: [ObjectWithDepth]
+    let isDepthEnabled: Bool
 
     var body: some View {
         ZStack {
-            ForEach(objects, id: \.uuid) { object in
+            ForEach(objects, id: \.observation.uuid) { object in
                 GeometryReader { geometry in
                     let size = geometry.size
-                    let boundingBox = object.boundingBox
-                    let className = object.labels.first?.identifier ?? "Unknown"
-
-                    // Get a unique color for the class name using ColorManager
+                    let boundingBox = object.observation.boundingBox
+                    let className = object.observation.labels.first?.identifier ?? "Unknown"
                     let color = ColorManager.getColor(for: className)
 
                     let rect = CGRect(
@@ -77,17 +76,26 @@ struct BoundingBoxOverlay: View {
                     }
                     .stroke(color, lineWidth: 2)
 
-                    // Display the label with the class name and confidence
-                    Text("\(className): \(String(format: "%.2f", object.confidence))")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundColor(color)
-                        .position(x: rect.midX, y: rect.minY - 10) // Position the label above the bounding box
+                    VStack {
+                        Text("\(className): \(String(format: "%.2f", object.observation.confidence))")
+                        if isDepthEnabled, let depth = object.depth {
+                            Text("Depth: \(String(format: "%.2f", depth)) m")
+                        }
+                    }
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(color)
+                    .position(x: rect.midX, y: rect.minY - 20)
                 }
             }
         }
     }
 }
 
+// Create a new struct to hold object and depth information
+struct ObjectWithDepth {
+    let observation: VNRecognizedObjectObservation
+    let depth: Float?
+}
 
 struct DeveloperView: View {
     @StateObject private var cameraController = CameraController()  // Use new CameraController instance
@@ -124,27 +132,27 @@ struct DeveloperView: View {
                 
                 // Display bounding boxes for detected objects
                 if cameraController.detectionEnabled {
-                    BoundingBoxOverlay(objects: detectedObjects)
+                    BoundingBoxOverlay(objects: cameraController.objectsWithDepth, isDepthEnabled: isDepthEnabled)
                         .frame(height: 450)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(radius: 5)
                 }
 
                 // Display a reticle if LiDAR is enabled
-                if isDepthEnabled {
-                    VStack {
-                        Spacer()
-                        Text("Depth: \(cameraController.closestDepth, specifier: "%.2f") meters")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.black.opacity(0.7))
-                            .cornerRadius(8)
-                        Spacer()
-                    }
-                    .transition(.opacity)
-                    .animation(.easeInOut, value: isDepthEnabled)
-                }
+//                if isDepthEnabled {
+//                    VStack {
+//                        Spacer()
+//                        Text("Depth: \(cameraController.closestDepth, specifier: "%.2f") meters")
+//                            .font(.headline)
+//                            .foregroundColor(.white)
+//                            .padding(8)
+//                            .background(Color.black.opacity(0.7))
+//                            .cornerRadius(8)
+//                        Spacer()
+//                    }
+//                    .transition(.opacity)
+//                    .animation(.easeInOut, value: isDepthEnabled)
+//                }
             }
 
             VStack(spacing: 16) {
@@ -278,15 +286,15 @@ struct DeveloperView: View {
             }
             
             cameraController.detectionHandler.onDetectionsUpdate = { detections in
-                if filterKeyword != nil {
-                    // Apply filter immediately if a filter is active
-                    detectedObjects = detections.filter { object in
-                        guard let className = object.labels.first?.identifier else { return false }
-                        return className.lowercased() == filterKeyword?.lowercased()
+                if let filterKeyword = filterKeyword {
+                    // Apply filter
+                    self.cameraController.objectsWithDepth = detections.filter { object in
+                        guard let className = object.observation.labels.first?.identifier else { return false }
+                        return className.lowercased() == filterKeyword.lowercased()
                     }
                 } else {
-                    // Otherwise, just update detectedObjects normally
-                    detectedObjects = detections
+                    // Update objectsWithDepth normally
+                    self.cameraController.objectsWithDepth = detections
                 }
             }
         }

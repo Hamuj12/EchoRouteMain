@@ -11,10 +11,10 @@ import CoreML
 import Vision
 
 class DetectionHandler {
+    var onDetectionsUpdate: (([ObjectWithDepth]) -> Void)?
+    private(set) var detectedObjects: [VNRecognizedObjectObservation] = []
     private var model: VNCoreMLModel?
     private var detectionRequests: [VNCoreMLRequest] = []
-    var onDetectionsUpdate: (([VNRecognizedObjectObservation]) -> Void)? // Callback to update the UI
-    
     init() {
         loadModel()
     }
@@ -57,12 +57,10 @@ class DetectionHandler {
             return
         }
         
-        DispatchQueue.main.async {
-            // Pass the detections to a view or controller for rendering
-            for result in results {
-                print("Detected object: \(result.labels.first?.identifier ?? "unknown") with confidence \(result.confidence)")
-            }
-            self.onDetectionsUpdate?(results)
+        DispatchQueue.main.async { [weak self] in
+            self?.detectedObjects = results
+            let objectsWithDepth = results.map { ObjectWithDepth(observation: $0, depth: nil) }
+            self?.onDetectionsUpdate?(objectsWithDepth)
         }
     }
 }
