@@ -144,55 +144,51 @@ struct DeveloperView: View {
                 }
             }
 
-            HStack(spacing: 16) {
-                Button(cameraController.isSessionRunning ? "Stop Camera Capture" : "Start Camera Capture") {
-                    if cameraController.isSessionRunning {
-                        cameraController.stopSession()
-                    } else {
-                        cameraController.startSession()
+            VStack(spacing: 16) {
+                Toggle(isOn: Binding(
+                    get: { cameraController.isSessionRunning },
+                    set: { newValue in
+                        if newValue {
+                            cameraController.startSession()
+                        } else {
+                            cameraController.stopSession()
+                        }
                     }
+                )) {
+                    Text("Enable Camera")
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle)
-                .controlSize(.large)
-                .background(cameraController.isSessionRunning ? Color.blue : Color.clear)
-                .foregroundColor(cameraController.isSessionRunning ? Color.white : Color.blue)
-                .cornerRadius(12)
+                .toggleStyle(SwitchToggleStyle())
 
-                Button(isDepthEnabled ? "Disable LiDAR Depth" : "Enable LiDAR Depth") {
-                    isDepthEnabled.toggle()
+                Toggle(isOn: Binding(
+                    get: { isDepthEnabled },
+                    set: { newValue in
+                        if newValue {
+                            isDepthEnabled = true
+                        } else {
+                            isDepthEnabled = false
+                        }
+                    }
+                )) {
+                    Text("Enable Depth")
                 }
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.roundedRectangle)
-                .controlSize(.large)
-                .background(isDepthEnabled ? Color.blue : Color.clear)
-                .foregroundColor(isDepthEnabled ? Color.white : Color.blue)
-                .cornerRadius(12)
+                .toggleStyle(SwitchToggleStyle())
+                
+                Toggle(isOn: Binding(
+                    get: { cameraController.detectionEnabled },
+                    set : { newValue in
+                        if newValue {
+                            cameraController.enableDetections(true)
+                        } else {
+                            cameraController.enableDetections(false)
+                        }
+                    }
+                )) {
+                    Text("Enable Detection")
+                }
+                .toggleStyle(SwitchToggleStyle())
             }
             .frame(maxWidth: .infinity)
             .padding()
-            
-            HStack {
-                Button(action: {
-                    cameraController.enableDetections(true)
-                }) {
-                    Text("Enable Detections")
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-                
-                Button(action: {
-                    cameraController.enableDetections(false)
-                }) {
-                    Text("Disable Detections")
-                        .padding()
-                        .background(Color.red)
-                        .foregroundColor(.white)
-                        .cornerRadius(8)
-                }
-            }
             
             // Display transcribed and parsed text
             ScrollView {
@@ -269,8 +265,8 @@ struct DeveloperView: View {
 
     // Parse recorded text using ModelHandler and trigger TTS
     private func parseText() {
-//        let recordedText = speechRecognizer.transcript
-        let recordedText = "Find me somewhere to sit"
+        let recordedText = speechRecognizer.transcript
+//        let recordedText = "Find me somewhere to sit"
         let cleanedText = cleanText(recordedText)
 
         modelHandler.predictCompletion(for: cleanedText) { prediction, error in
