@@ -11,11 +11,22 @@ import NaturalLanguage
 class ModelHandler {
     private let tokenizer = BertTokenizer()
     
-    func predictCompletion(for objects: String, completion: @escaping (String?, Error?) -> Void) {
+    func predictCompletion(for objects: String) async throws -> String {
         let prompt = "\(objects). the user is looking for a [MASK]."
-            
-            predictMaskedToken(in: prompt, completion: completion)
+        return try await predictMaskedToken(in: prompt)
+    }
+    
+    private func predictMaskedToken(in text: String) async throws -> String {
+        return try await withCheckedThrowingContinuation { continuation in
+            predictMaskedToken(in: text) { prediction, error in
+                if let prediction = prediction {
+                    continuation.resume(returning: prediction)
+                } else if let error = error {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
+    }
     
     func predictMaskedToken(in text: String, completion: @escaping (String?, Error?) -> Void) {
         do {

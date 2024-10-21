@@ -96,6 +96,8 @@ struct DeveloperView: View {
     @State private var parsedText: String = ""  // Store parsed text
     @State private var isDepthEnabled = false  // Track LiDAR depth toggle
     @State private var detectedObjects: [VNRecognizedObjectObservation] = []
+    @State private var filterKeyword: String? = nil
+    
     private let modelHandler = ModelHandler()  // Instance of ModelHandler
     private let speechSynthesizer = AVSpeechSynthesizer()  // AVSpeechSynthesizer for TTS
     
@@ -223,6 +225,21 @@ struct DeveloperView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.large)
                 .buttonBorderShape(.roundedRectangle)
+                
+                Button("Filter") {
+                    Task {
+                        do {
+                            let prediction = try await modelHandler.predictCompletion(for: cleanText(speechRecognizer.transcript))
+                            filterKeyword = prediction  // Store the prediction for filtering
+                            applyFilter()  // Apply the filter after updating the keyword
+                        } catch {
+                            print("Error parsing text: \(error.localizedDescription)")
+                        }
+                    }
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.large)
+                .buttonBorderShape(.roundedRectangle)
             }
             .padding()
         }
@@ -234,7 +251,16 @@ struct DeveloperView: View {
             }
             
             cameraController.detectionHandler.onDetectionsUpdate = { detections in
-                detectedObjects = detections
+                if filterKeyword != nil {
+                    // Apply filter immediately if a filter is active
+                    detectedObjects = detections.filter { object in
+                        guard let className = object.labels.first?.identifier else { return false }
+                        return className.lowercased() == filterKeyword?.lowercased()
+                    }
+                } else {
+                    // Otherwise, just update detectedObjects normally
+                    detectedObjects = detections
+                }
             }
         }
         .onDisappear {
@@ -260,24 +286,46 @@ struct DeveloperView: View {
             .joined()
             .lowercased()
     }
+    
+    private func applyFilter() {
+        // Ensure camera session is running and detection is enabled
+        guard cameraController.isSessionRunning, cameraController.detectionEnabled else {
+            print("Camera session or detection is not active.")
+            return
+        }
+
+        // Ensure we have a valid filter keyword
+        guard let keyword = filterKeyword else {
+            print("No valid filter keyword.")
+            return
+        }
+
+        // Filter detected objects based on the predicted class name
+        detectedObjects = detectedObjects.filter { object in
+            guard let className = object.labels.first?.identifier else { return false }
+            return className.lowercased() == keyword.lowercased()
+        }
+
+        print("Filtered objects: \(detectedObjects.map { $0.labels.first?.identifier ?? "Unknown" })")
+    }
+
 
     // Parse recorded text using ModelHandler and trigger TTS
     private func parseText() {
         let recordedText = speechRecognizer.transcript
-//        let recordedText = "Find me somewhere to sit"
         let cleanedText = cleanText(recordedText)
 
-        modelHandler.predictCompletion(for: cleanedText) { prediction, error in
-            if let prediction = prediction {
-                DispatchQueue.main.async {
-                    self.parsedText = prediction
-                    self.speakText(prediction)  // Call TTS function
-                }
-            } else if let error = error {
+        Task {
+            do {
+                let prediction = try await modelHandler.predictCompletion(for: cleanedText)
+                self.parsedText = prediction
+                speakText(prediction)
+            } catch {
                 print("Error parsing text: \(error.localizedDescription)")
             }
         }
     }
+
 
     // Text-to-Speech function
     private func speakText(_ text: String) {
